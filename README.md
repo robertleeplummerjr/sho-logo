@@ -2,7 +2,7 @@
 
 An svg generator for the 92-95 Ford Taurus SHO slotted logo generator.
 
-![SHO Logo Rendered](rendered.png)
+![SHO Logo Generated as SVG](sho.svg)
 
 ## Overview
 
