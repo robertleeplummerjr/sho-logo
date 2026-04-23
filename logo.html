@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>SHO SVG - Accurate</title>
+  <style>
+    body {
+      background: #222;
+      margin: 16px;
+    }
+    #reference-stack {
+      position: relative;
+      display: inline-block;
+      line-height: 0;
+      /* width/height set in JS from params (matches SVG user space) */
+    }
+    #ref-img {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      pointer-events: auto;
+      transform: rotate(0.75deg) translateX(-22px) translateY(-26px);
+      transform-origin: center center;
+    }
+    #reference-stack #app {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+    #reference-stack #app svg {
+      pointer-events: auto;
+      cursor: pointer;
+    }
+    #reference-stack svg {
+      display: block;
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      overflow: visible;
+    }
+    #reference-stack svg .clip-debug-layer path {
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+<div id="reference-stack">
+  <img id="ref-img" src="logo_orig.png" alt="SHO reference (original)" />
+  <div id="app"></div>
+</div>
+<script>
+(() => {
+  const params = {
+    width: 1200,
+    height: 400,
+
+    /** ~20% thicker than 5px */
+    lineThickness: 10,
+
+    hLetterSpacing: 52,
+    oLetterSpacing: 52,
+
+    S_width: 324,
+    H_width: 310,
+    O_width: 320,
+
+    letterHeight: 190,
+
+    /** Vertical gap in H and between upper / lower stripe blocks. */
+    middleGap: 26,
+
+    topLines: 6,
+    bottomLines: 6,
+    /** Subtle rounding on clip-path silhouette corners (user space px). */
+    edgeFillet: 3,
+    debug: false
+  };
+
+  /** Top-to-top distance between stripe rows so six stripes fill each half-band. */
+  function stripePitch() {
+    const n = params.topLines;
+    const t = params.lineThickness;
+    const band = (params.letterHeight - params.middleGap) / 2;
+    const gap = (band - n * t) / (n - 1);
+    return t + gap;
+  }
+
+  function svgEl(tag) {
+    return document.createElementNS("http://www.w3.org/2000/svg", tag);
+  }
+
+  let svg;
+  function createSVG() {
+    svg = svgEl("svg");
+    svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    svg.setAttribute("width", String(params.width));
+    svg.setAttribute("height", String(params.height));
+    svg.setAttribute("viewBox", `0 0 ${params.width} ${params.height}`);
+    svg.setAttribute("overflow", "visible");
+  }
+  let defs;
+  function createDefs() {
+    defs = svgEl("defs");
+    svg.appendChild(defs);
+  }
+
+  let clipPath;
+  function createClipPath() {
+    clipPath = svgEl("clipPath");
+    defs.appendChild(clipPath);
+    return clipPath;
+  }
+
+  function insertSvgNodeAfterTitle(node) {
+    const t = svg.querySelector("title");
+    if (t) {
+      if (t.nextSibling) svg.insertBefore(node, t.nextSibling);
+      else svg.appendChild(node);
+    } else {
+      svg.insertBefore(node, svg.firstChild);
+    }
+  }
+
+  let __shoCenterSquareClipSeq = 0;
+
+  /**
+   * Appends a `<circle>` at the SVG center with pink fill (primitive tags only, no path).
+   * Inserts just after `<title>` when present so it tends to sit behind letter artwork.
+   */
+  function addCircle(opts) {
+    const radius = opts.radius;
+    if (!radius) {
+      throw new Error("radius is required");
+    }
+    const x = opts.x;
+    if (!x) {
+      throw new Error("x is required");
+    }
+    const y = opts.y;
+    if (!y) {
+      throw new Error("y is required");
+    }
+    const debug = opts.debug != null ? opts.debug : false;
+    const fill = debug ? (opts.fill != null ? opts.fill : "rgba(128, 128, 128, .5)") : (opts.fill != null ? opts.fill : "white");
+    const circle = svgEl("circle");
+    circle.setAttribute("cx", String(x / 2));
+    circle.setAttribute("cy", String(y / 2));
+    circle.setAttribute("r", String(radius));
+    circle.setAttribute("fill", fill);
+    circle.setAttribute("pointer-events", "none");
+
+    if (opts.clipPath) {
+      opts.clipPath.appendChild(circle);
+    } else {
+      if (debug) {
+        svg.appendChild(circle);
+      } else {
+        insertSvgNodeAfterTitle(circle);
+      }
+    }
+    return circle;
+  }
+
+  function addOval(opts) {
+    const rx = opts.rx;
+    const ry = opts.ry;
+    if (!rx || !ry) {
+      throw new Error("rx and ry are required");
+    }
+    const x = opts.x;
+    if (x === undefined) {
+      throw new Error("x is required");
+    }
+    const y = opts.y;
+    if (y === undefined) {
+      throw new Error("y is required");
+    }
+    const debug = opts.debug != null ? opts.debug : false;
+    const fill = debug ? (opts.fill != null ? opts.fill : "rgba(128, 128, 128, .5)") : (opts.fill != null ? opts.fill : "white");
+    const ellipse = svgEl("ellipse");
+    ellipse.setAttribute("cx", String(x / 2));
+    ellipse.setAttribute("cy", String(y / 2));
+    ellipse.setAttribute("rx", String(rx));
+    ellipse.setAttribute("ry", String(ry));
+    ellipse.setAttribute("fill", fill);
+    ellipse.setAttribute("pointer-events", "none");
+
+    if (opts.clipPath) {
+      opts.clipPath.appendChild(ellipse);
+    } else {
+      if (debug) {
+        svg.appendChild(ellipse);
+      } else {
+        insertSvgNodeAfterTitle(ellipse);
+      }
+    }
+    return ellipse;
+  }
+
+  /**
+   * Appends a centered square from `<rect>` + `<clipPath>` containing only `<rect>` (no path).
+   * Radius 3px applies to the two corners on one side only (`top` | `bottom` | `left` | `right`):
+   * the outer rect is oversized on the opposite axis so the far corners are clipped off.
+   */
+  function addRect(opts) {
+    const o = opts || {};
+    const height = o.height;
+    if (!height) {
+      throw new Error("height is required");
+    }
+    const width = o.width;
+    if (!width) {
+      throw new Error("width is required");
+    }
+    const x = o.x;
+    if (x === undefined) {
+      throw new Error("x is required");
+    }
+    const y = o.y;
+    if (y === undefined) {
+      throw new Error("y is required");
+    }
+    const debug = o.debug != null ? o.debug : false;
+    const cornerR = o.cornerRadius != null ? o.cornerRadius : 3;
+    let fill = o.fill;
+    if (fill === undefined) {
+      fill = debug ? "rgba(128, 128, 128, .5)" : "white";
+    }
+
+    const W = width;
+    const H = height;
+    const R = cornerR;
+
+    const body = svgEl("rect");
+    body.setAttribute("rx", String(R));
+    body.setAttribute("ry", String(R));
+    body.setAttribute("fill", fill);
+    body.setAttribute("pointer-events", "none");
+    body.setAttribute("x", String(x / 2));
+    body.setAttribute("y", String(y / 2));
+    body.setAttribute("width", String(W));
+    body.setAttribute("height", String(H));
+
+    if (o.clipPath) {
+      o.clipPath.appendChild(body);
+    } else {
+      const clipId = "sho-sq-1side-" + __shoCenterSquareClipSeq++;
+      const clipPath = svgEl("clipPath");
+      clipPath.setAttribute("id", clipId);
+      const clipRect = svgEl("rect");
+      const clipX = x / 2;
+      const clipY = y / 2;
+      clipRect.setAttribute("x", String(clipX));
+      clipRect.setAttribute("y", String(clipY));
+      clipRect.setAttribute("width", String(W));
+      clipRect.setAttribute("height", String(H));
+      clipPath.appendChild(clipRect);
+      insertSvgNodeAfterTitle(clipPath);
+
+      const g = svgEl("g");
+      if (!debug) {
+        g.setAttribute("clip-path", "url(#" + clipId + ")");
+      }
+      g.appendChild(body);
+      if (debug) {
+        svg.appendChild(g);
+      } else {
+        if (clipPath.nextSibling) svg.insertBefore(g, clipPath.nextSibling);
+        else svg.appendChild(g);
+      }
+    }
+
+    return body;
+  }
+
+  function addMaskRect(opts) {
+    const debug = opts.debug != null ? opts.debug : false;
+    return addRect({ ...opts, fill: debug ? "rgba(128, 128, 128, .5)" : "black" });
+  }
+
+  // =========================
+  // STRIPES (full letter width; pitch ~50% tighter than old fixed 17px step)
+  // =========================
+
+  function createStripes(x, y, width) {
+    const g = svgEl("g");
+    const n = params.topLines;
+    const pitch = stripePitch();
+    const t = params.lineThickness;
+
+    for (let i = 0; i < n; i++) {
+      const r = svgEl("rect");
+      r.setAttribute("x", x);
+      r.setAttribute("y", y + i * pitch);
+      r.setAttribute("width", width);
+      r.setAttribute("height", t);
+      r.setAttribute("fill", "white");
+      g.appendChild(r);
+    }
+
+    const y2 = y + (n - 1) * pitch + t + params.middleGap;
+    for (let i = 0; i < params.bottomLines; i++) {
+      const r = svgEl("rect");
+      r.setAttribute("x", x);
+      r.setAttribute("y", y2 + i * pitch);
+      r.setAttribute("width", width);
+      r.setAttribute("height", t);
+      r.setAttribute("fill", "white");
+      g.appendChild(r);
+    }
+
+    return g;
+  }
+
+
+  // =========================
+  // CLIP
+  // =========================
+  function buildSLetter(x, y) {
+    const w = params.S_width;
+    const h = params.letterHeight;
+    const gap = params.middleGap;
+    const bandH = (h - gap) / 2;
+    const debug = params.debug;
+    const stripes = createStripes(x, y, w);
+    const mask = svgEl("mask");
+    const id = "mask-s-" + Math.random().toString(36).substr(2, 9);
+    mask.setAttribute("id", id);
+    defs.appendChild(mask);
+
+    const common = { debug, clipPath: mask, cornerRadius: 4, fill: debug ? "rgba(128, 128, 128, .5)" : "white" };
+
+    // S is composed of two main arcs (rectangles with rounded corners) and two circles.
+    // The geometry is defined relative to the letter width (w), height (h), and the middle gap (gap).
+    
+    const radius = bandH / 2;
+    const rectW = w - radius;
+    const rectH = bandH;
+    
+    // Vertical positions
+    const topRectY = y;
+    const bottomRectY = topRectY + bandH + gap;
+
+    // Top Curve (Upper part of S)
+    addCircle({
+      ...common,
+      radius: radius,
+      x: (x + radius) * 2,
+      y: (topRectY + radius) * 2,
+    });
+    addRect({
+      ...common,
+      width: rectW,
+      height: rectH,
+      x: (x + radius) * 2,
+      y: topRectY * 2,
+    });
+
+    // Bottom Curve (Lower part of S)
+    addCircle({
+      ...common,
+      radius: radius,
+      x: (x + w - radius) * 2,
+      y: (bottomRectY + radius) * 2,
+    });
+    addRect({
+      ...common,
+      width: rectW,
+      height: rectH,
+      x: x * 2,
+      y: bottomRectY * 2,
+    });
+
+    stripes.setAttribute("mask", `url(#${id})`);
+    svg.appendChild(stripes);
+
+    if (debug) {
+      // In debug mode, we want to see the shapes without them being clipped away.
+      // So we'll use a local common that doesn't have the clipPath.
+      const debugCommon = { ...common, clipPath: null };
+      
+      const dradius = bandH / 2;
+      const drectW = w - dradius;
+      const drectH = bandH;
+      const dtopRectY = y;
+      const dbottomRectY = dtopRectY + bandH + gap;
+
+      addCircle({ ...debugCommon, radius: dradius, x: (x + dradius) * 2, y: (dtopRectY + dradius) * 2 });
+      addRect({ ...debugCommon, width: drectW, height: drectH, x: (x + dradius) * 2, y: dtopRectY * 2 });
+      addCircle({ ...debugCommon, radius: dradius, x: (x + w - dradius) * 2, y: (dbottomRectY + dradius) * 2 });
+      addRect({ ...debugCommon, width: drectW, height: drectH, x: x * 2, y: dbottomRectY * 2 });
+    }
+  }
+
+  function buildHLetter(x, y, legSize) {
+    const w = params.H_width;
+    const h = params.letterHeight;
+    const t = params.lineThickness;
+    const sp = stripePitch();
+    const cy = y + h / 2;
+    const gap = params.middleGap;
+    const gapTop = cy - gap / 2;
+    const gapBottom = cy + gap / 2;
+    const debug = params.debug;
+
+    const stripes = createStripes(x, y, w);
+    const mask = svgEl("mask");
+    const id = "mask-h-" + Math.random().toString(36).substr(2, 9);
+    mask.setAttribute("id", id);
+    defs.appendChild(mask);
+
+    const common = { debug, clipPath: mask, cornerRadius: params.edgeFillet, fill: debug ? "rgba(128, 128, 128, .5)" : "white" };
+
+    // Upper Section
+    const upperH = gapTop - y;
+
+    // 1 left top rectangle that exposes the lines for the first upper fork of the H
+    addRect({
+      ...common,
+      x: x * 2,
+      y: y * 2,
+      width: legSize,
+      height: upperH
+    });
+
+    // 1 right top rectangle that exposes the lines for the second upper fork of the H
+    addRect({
+      ...common,
+      x: (x + w - legSize) * 2,
+      y: y * 2,
+      width: legSize,
+      height: upperH
+    });
+
+    // 1 rectangle at the bottom of these two upper forks, that connects them together..
+    const upperRungHeight = 2 * sp + t; 
+    addRect({
+      ...common,
+      x: x * 2,
+      y: (gapTop - upperRungHeight) * 2,
+      width: w,
+      height: upperRungHeight
+    });
+
+    // 1 mask rectangle directly beside it which will provide the masked area between the forks of the H which hides the lines
+    addMaskRect({
+      ...common,
+      x: (x + legSize) * 2,
+      y: (y - 10) * 2,
+      width: w - 2 * legSize,
+      height: upperH + 10 - upperRungHeight
+    });
+
+    // 4th bar slice (75% from above)
+    // The 4th bar is at index 3 in the top section.
+    // It should overlap with the mask above (which ends at y + 3*sp)
+    addMaskRect({
+      ...common,
+      x: (x + legSize) * 2,
+      y: (y - 10) * 2,
+      width: w - 2 * legSize,
+      height: (3 * sp + t * 0.66) + 10
+    });
+
+    // Bottom Section
+    const lowerH = (y + h) - gapBottom;
+
+    // 1 left bottom rectangle that exposes the lines for the third lower fork of the H
+    addRect({
+      ...common,
+      x: x * 2,
+      y: gapBottom * 2,
+      width: legSize,
+      height: lowerH
+    });
+
+    // 1 right bottom rectangle that exposes the lines for the forth lower fork of the H
+    addRect({
+      ...common,
+      x: (x + w - legSize) * 2,
+      y: gapBottom * 2,
+      width: legSize,
+      height: lowerH
+    });
+
+    // 1 rectangle at the top of these two ower forks that connects them together
+    const lowerRungHeight = 2 * sp + t;
+    addRect({
+      ...common,
+      x: x * 2,
+      y: gapBottom * 2,
+      width: w,
+      height: lowerRungHeight
+    });
+
+    // 1 mask rectangle directly beside it which will provide the masked area between the forks of the H which hides the lines
+    addMaskRect({
+      ...common,
+      x: (x + legSize) * 2,
+      y: (gapBottom + lowerRungHeight) * 2,
+      width: w - 2 * legSize,
+      height: lowerH - lowerRungHeight + 10
+    });
+
+    // 9th bar slice (75% from below)
+    // The 9th bar is the 3rd bar in the bottom section (index 2).
+    // It should overlap with the mask below (which starts at y2 + 2*sp + t)
+    const y2 = y + (params.topLines - 1) * sp + t + gap;
+    addMaskRect({
+      ...common,
+      x: (x + legSize) * 2,
+      y: (y2 + 2 * sp + t * 0.33) * 2,
+      width: w - 2 * legSize,
+      height: (lowerH - (2 * sp + t * 0.25)) + 10
+    });
+
+    // Apply mask to stripes and add to SVG
+    stripes.setAttribute("mask", `url(#${id})`);
+    svg.appendChild(stripes);
+
+    if (debug) {
+      const debugCommon = { ...common, clipPath: null };
+      const upperH = gapTop - y;
+      const upperRungHeight = 2 * sp + t; 
+      addRect({ ...debugCommon, x: x * 2, y: y * 2, width: legSize, height: upperH });
+      addRect({ ...debugCommon, x: (x + w - legSize) * 2, y: y * 2, width: legSize, height: upperH });
+      addRect({ ...debugCommon, x: x * 2, y: (gapTop - upperRungHeight) * 2, width: w, height: upperRungHeight });
+      
+      const lowerH = y + h - gapBottom;
+      const lowerRungHeight = 2 * sp + t; 
+      addRect({ ...debugCommon, x: x * 2, y: gapBottom * 2, width: legSize, height: lowerH });
+      addRect({ ...debugCommon, x: (x + w - legSize) * 2, y: gapBottom * 2, width: legSize, height: lowerH });
+      addRect({ ...debugCommon, x: x * 2, y: gapBottom * 2, width: w, height: lowerRungHeight });
+    }
+  }
+
+  function buildOLetter(x, y) {
+    const w = params.O_width;
+    const h = params.letterHeight;
+    const gap = params.middleGap;
+    const bandH = (h - gap) / 2;
+    const debug = params.debug;
+    const stripes = createStripes(x, y, w);
+
+    const mask = svgEl("mask");
+    const id = "mask-o-" + Math.random().toString(36).substr(2, 9);
+    mask.setAttribute("id", id);
+    defs.appendChild(mask);
+
+    const common = { debug, clipPath: mask, cornerRadius: params.edgeFillet, fill: debug ? "rgba(128, 128, 128, .5)" : "white" };
+
+    const radius = bandH / 2;
+    const rx = radius * 1.3;
+    const ry = (radius - 8) * 1.3;
+    
+    // Top section
+    const topY = y;
+    // an oval in the top left
+    addOval({
+      ...common,
+      rx: rx,
+      ry: ry,
+      x: (x + rx) * 2,
+      y: (topY + ry) * 2
+    });
+    // an oval in the top right
+    addOval({
+      ...common,
+      rx: rx,
+      ry: ry,
+      x: (x + w - rx) * 2,
+      y: (topY + ry) * 2
+    });
+    // a rectangle that spans between them
+    addRect({
+      ...common,
+      x: (x + rx) * 2,
+      y: topY * 2,
+      width: w - 2 * rx,
+      height: ry
+    });
+    // a rectangle that spans from the middle of the ovals above to the bottom of the top section of the "O"
+    addRect({
+      ...common,
+      x: x * 2,
+      y: (topY + ry) * 2,
+      width: w,
+      height: bandH - ry
+    });
+
+    // Bottom section (vertically flipped)
+    const bottomY = y + bandH + gap;
+    // an oval in the bottom left
+    addOval({
+      ...common,
+      rx: rx,
+      ry: ry,
+      x: (x + rx) * 2,
+      y: (bottomY + bandH - ry) * 2
+    });
+    // an oval in the bottom right
+    addOval({
+      ...common,
+      rx: rx,
+      ry: ry,
+      x: (x + w - rx) * 2,
+      y: (bottomY + bandH - ry) * 2
+    });
+    // a rectangle that spans between them (at the bottom)
+    addRect({
+      ...common,
+      x: (x + rx) * 2,
+      y: (bottomY + bandH - ry) * 2,
+      width: w - 2 * rx,
+      height: ry
+    });
+    // a rectangle that spans from the middle of the ovals below to the top of the bottom section of the "O"
+    addRect({
+      ...common,
+      x: x * 2,
+      y: bottomY * 2,
+      width: w,
+      height: bandH - ry
+    });
+
+    stripes.setAttribute("mask", `url(#${id})`);
+    svg.appendChild(stripes);
+
+    if (debug) {
+      const debugCommon = { ...common, clipPath: null };
+      const dradius = bandH / 2;
+      const drx = dradius * 1.3;
+      const dry = (dradius - 8) * 1.3;
+      const dtopY = y;
+      const dbottomY = y + bandH + gap;
+
+      addOval({ ...debugCommon, rx: drx, ry: dry, x: (x + drx) * 2, y: (dtopY + dry) * 2 });
+      addOval({ ...debugCommon, rx: drx, ry: dry, x: (x + w - drx) * 2, y: (dtopY + dry) * 2 });
+      addRect({ ...debugCommon, x: (x + drx) * 2, y: dtopY * 2, width: w - 2 * drx, height: dry });
+      addRect({ ...debugCommon, x: x * 2, y: (dtopY + dry) * 2, width: w, height: bandH - dry });
+
+      addOval({ ...debugCommon, rx: drx, ry: dry, x: (x + drx) * 2, y: (dbottomY + bandH - dry) * 2 });
+      addOval({ ...debugCommon, rx: drx, ry: dry, x: (x + w - drx) * 2, y: (dbottomY + bandH - dry) * 2 });
+      addRect({ ...debugCommon, x: (x + drx) * 2, y: (dbottomY + bandH - dry) * 2, width: w - 2 * drx, height: dry });
+      addRect({ ...debugCommon, x: x * 2, y: dbottomY * 2, width: w, height: bandH - dry });
+    }
+  }
+
+  // =========================
+  // EXPORT (click SVG to save a standalone file for Preview / Photos / etc.)
+  // =========================
+
+  function serializeSvgForDownload() {
+    const clone = svg.cloneNode(true);
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    const xml = new XMLSerializer().serializeToString(clone);
+    const header = '<?xml version="1.0" encoding="UTF-8"?>\n';
+    return header + xml;
+  }
+
+  function downloadSHOSvg() {
+    const text = serializeSvgForDownload();
+    const blob = new Blob([text], { type: "image/svg+xml;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "sho-logo.svg";
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  function wireSvgClickToDownload() {
+    svg.addEventListener("click", function (e) {
+      e.preventDefault();
+      downloadSHOSvg();
+    });
+  }
+
+  // =========================
+  // BUILD
+  // =========================
+  function rebuildSHOLogo() {
+    const app = document.getElementById("app");
+    if (app) app.innerHTML = "";
+    createSVG();
+    createDefs();
+    createClipPath();
+
+    const startX = 50;
+    const startY = 80;
+
+    let x = startX;
+    buildSLetter(x, startY);
+
+    x += params.S_width + params.hLetterSpacing;
+    buildHLetter(x, startY, 92);
+
+    x += params.H_width + params.oLetterSpacing;
+    buildOLetter(x, startY);
+
+    if (app) {
+      wireSvgClickToDownload();
+      const hint = svgEl("title");
+      hint.textContent = "Click to download SVG";
+      svg.insertBefore(hint, svg.firstChild);
+      app.appendChild(svg);
+    }
+    syncReferenceStackSize();
+  }
+
+  /** Stack matches SVG design pixels so the vector is 1:1; PNG fits inside with object-fit. */
+  function syncReferenceStackSize() {
+    const stack = document.getElementById("reference-stack");
+    if (!stack) return;
+    stack.style.width = params.width + "px";
+    stack.style.height = params.height + "px";
+  }
+
+  syncReferenceStackSize();
+
+  const refImg = document.getElementById("ref-img");
+  refImg.addEventListener("load", syncReferenceStackSize);
+
+  rebuildSHOLogo();
+
+  window.addEventListener("keydown", (e) => {
+    if (e.key.toLowerCase() === "d") {
+      params.debug = !params.debug;
+      console.log("Debug mode:", params.debug);
+      rebuildSHOLogo();
+    }
+  });
+})();
+</script>
+
+</body>
+</html>
